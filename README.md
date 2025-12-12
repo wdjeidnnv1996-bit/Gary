@@ -1,166 +1,104 @@
-import argparse
-from pathlib import Path
 import random
 import time
-import re
+# В реальной жизни здесь использовались бы модули Pulseq
+# import pypulseq as mr 
 
-# --- Вспомогательные функции ---
+# --- Имитация основных функций Pulseq ---
 
-def format_size(size_bytes):
-    """Преобразует байты в удобочитаемый формат (КБ, МБ и т.д.)."""
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    size_kb = size_bytes / 1024
-    if size_kb < 1024:
-        return f"{size_kb:.2f} KB"
-    size_mb = size_kb / 1024
-    return f"{size_mb:.2f} MB"
+def create_rf_pulse(flip_angle, duration_ms):
+    """Имитирует создание РЧ-импульса (Радиочастотного)."""
+    return {"type": "RF", "angle": f"{flip_angle}°", "duration": f"{duration_ms} ms"}
 
-def read_gitignore_patterns(base_path: Path):
+def create_gradient(axis, amplitude_mT_m, duration_us):
+    """Имитирует создание градиента (Линейное изменение поля)."""
+    return {"type": "GRAD", "axis": axis, "amplitude": f"{amplitude_mT_m} mT/m", "duration": f"{duration_us} us"}
+
+def create_adc(dwell_time_us, num_samples):
+    """Имитирует создание окна сбора данных (Аналого-Цифровой Преобразователь)."""
+    return {"type": "ADC", "dwell": f"{dwell_time_us} us", "samples": num_samples}
+
+# --- Основная функция: Программирование последовательности ---
+
+def program_gradient_echo_sequence(
+        TR_ms=100, 
+        TE_ms=5, 
+        flip_angle=random.randint(5, 90)
+    ):
     """
-    Читает .gitignore в базовой директории и компилирует паттерны в регулярные выражения.
+    Программирует простую 2D последовательность Градиентное Эхо (GRE).
+    GRE - это самая быстрая и базовая последовательность.
     """
-    gitignore_path = base_path / ".gitignore"
-    patterns = []
     
-    if gitignore_path.exists():
-        with open(gitignore_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                # Игнорируем комментарии и пустые строки
-                if not line or line.startswith('#'):
-                    continue
-                # Преобразуем паттерн gitignore в регулярное выражение
-                # Например, *.pyc -> .*?\.pyc$
-                pattern = re.escape(line).replace(r'\*', '.*?')
-                # Добавляем якорь в конец, чтобы избежать совпадений внутри имен
-                if not pattern.endswith('/'):
-                     pattern += '$' 
-                patterns.append(re.compile(pattern))
-        print(f"✅ Загружено {len(patterns)} правил из .gitignore.")
-    return patterns
-
-def is_ignored(path: Path, patterns: list):
-    """Проверяет, должен ли путь быть проигнорирован."""
-    path_str = str(path)
+    # 1. Основные параметры (рандомно сгенерированные для примера)
+    BW_Hz = 100000  # Ширина полосы пропускания (Bandwidth)
+    FOV_mm = 256    # Поле обзора (Field of View)
+    matrix = 256    # Размер матрицы (Matrix Size)
     
-    # Сначала проверяем саму папку
-    if any(p.search(path_str) for p in patterns):
-        return True
+    # Рассчеты для градиентов и сбора данных
+    readout_duration_us = int(matrix * (1000000 / BW_Hz)) # Время считывания (в мкс)
+    time_to_center_us = int(readout_duration_us / 2)
     
-    # Проверяем файлы
-    if path.is_file() and path.name.lower() in ['.gitignore', 'license', 'readme.md']:
-        return True
-        
-    return False
-
-def analyze_directory(base_path: Path, max_depth: int = -1, ignore_patterns: list = None):
-    """
-    Сканирует директорию с поддержкой максимальной глубины и игнорирования.
-    """
-    file_summary = {}
-    total_files = 0
-    total_size_bytes = 0
+    # --- Инициализация последовательности ---
+    sequence = []
     
-    if ignore_patterns is None:
-        ignore_patterns = []
-
-    # Используем Path.rglob() для рекурсивного поиска
-    for path in base_path.rglob('*'):
-        
-        # Проверка глубины
-        try:
-            relative_depth = len(path.relative_to(base_path).parts)
-            if max_depth != -1 and relative_depth > max_depth:
-                continue
-        except ValueError:
-            continue # Пропускаем, если путь не является дочерним
-
-        # Проверка игнорирования
-        if is_ignored(path, ignore_patterns):
-            continue
-            
-        if path.is_file():
-            try:
-                size = path.stat().st_size
-            except OSError:
-                continue
-
-            total_files += 1
-            total_size_bytes += size
-            
-            # Получаем расширение
-            ext = path.suffix.lower() if path.suffix else "NO_EXT"
-            
-            if ext not in file_summary:
-                file_summary[ext] = {'count': 0, 'total_size': 0}
-                
-            file_summary[ext]['count'] += 1
-            file_summary[ext]['total_size'] += size
-            
-    return file_summary, total_files, total_size_bytes
-
-# --- Главная часть программы ---
-
-if __name__ == "__main__":
+    # --- 1. RF-Импульс возбуждения ---
+    # Угол наклона определяет контраст (Т1-зависимость)
+    rf_pulse = create_rf_pulse(flip_angle, duration_ms=1.0)
+    sequence.append(rf_pulse)
     
-    parser = argparse.ArgumentParser(
-        description="Анализатор файловой системы с поддержкой .gitignore и Pathlib."
-    )
-    # 
-    parser.add_argument(
-        'path', 
-        type=str, 
-        default='.', 
-        nargs='?', 
-        help='Путь к директории для анализа (по умолчанию - текущая).'
-    )
-    parser.add_argument(
-        '-d', '--depth', 
-        type=int, 
-        default=-1, 
-        help='Максимальная глубина сканирования (-1 для неограниченной).'
-    )
-    parser.add_argument(
-        '-i', '--ignore-git', 
-        action='store_true', 
-        help='Использовать правила из .gitignore.'
-    )
+    # --- 2. Градиент фазового кодирования (Pre-Phasing Gradient) ---
+    # Градиент, который задает первую точку в k-пространстве (Phase Encoding)
+    phase_encode_grad = create_gradient('Y', amplitude_mT_m=random.uniform(-5, 5), duration_us=500)
+    sequence.append(phase_encode_grad)
     
-    args = parser.parse_args()
+    # --- 3. Градиент считывания (Readout Dephasing) ---
+    # Градиент, который дефазирует сигнал перед считыванием
+    read_dephase_grad = create_gradient('X', amplitude_mT_m=random.uniform(-10, -5), duration_us=1000)
+    sequence.append(read_dephase_grad)
+
+    # --- 4. Задержка до TE (Time to Echo) ---
+    # Время между RF-импульсом и центром сбора данных (TE)
+    delay_to_te = {"type": "DELAY", "duration": f"{TE_ms - 2} ms"}
+    sequence.append(delay_to_te)
     
-    base_path = Path(args.path)
-    if not base_path.is_dir():
-        print(f"❌ ОШИБКА: Путь '{args.path}' не является директорией.")
-        exit(1)
-
-    ignore_patterns = []
-    if args.ignore_git:
-        ignore_patterns = read_gitignore_patterns(base_path)
-
-    # --- Запуск анализа ---
+    # --- 5. Сбор данных (ADC) и Градиент считывания ---
+    # ADC находится в центре градиента считывания
+    readout_grad = create_gradient('X', amplitude_mT_m=random.uniform(5, 10), duration_us=readout_duration_us)
+    adc_acquisition = create_adc(dwell_time_us=int(1000000 / BW_Hz), num_samples=matrix)
     
-    print("\n--- 💎 ГИПЕР-АНАЛИЗ ФАЙЛОВОЙ СИСТЕМЫ ---")
-    print(f"Сканирование пути: {base_path.resolve()}")
-    print("-" * 70)
+    sequence.append(readout_grad)
+    sequence.append(adc_acquisition)
+
+    # --- 6. Задержка до TR (Time to Repetition) ---
+    # TR - полное время цикла
+    delay_to_tr = {"type": "DELAY", "duration": f"{TR_ms - TE_ms} ms"}
+    sequence.append(delay_to_tr)
     
-    summary, total_files, total_size = analyze_directory(base_path, args.depth, ignore_patterns)
+    return sequence, TR_ms, flip_angle
 
-    # --- Генерация отчета ---
-    
-    print(f"Анализ завершен. Всего файлов: {total_files}")
-    print(f"Общий объем: {format_size(total_size)}")
-    print("-" * 70)
+# --- Выполнение ---
 
-    # Сортировка по общему размеру
-    sorted_summary = sorted(summary.items(), key=lambda item: item[1]['total_size'], reverse=True)
+# Случайные параметры
+TR_RANDOM = random.randint(50, 200)
+TE_RANDOM = random.randint(3, 15)
+ANGLE_RANDOM = random.randint(5, 45) # Для GRE обычно низкий угол
 
-    print(f"| {'Расширение':<12} | {'Файлов':<6} | {'Объем':<12} |")
-    print("-" * 35)
+pulse_sequence, TR, FA = program_gradient_echo_sequence(TR_ms=TR_RANDOM, TE_ms=TE_RANDOM, flip_angle=ANGLE_RANDOM)
 
-    for ext, data in sorted_summary:
-        size_formatted = format_size(data['total_size'])
-        print(f"| {ext:<12} | {data['count']:<6} | {size_formatted:<12} |")
+print("--- 🩺 ИМИТАЦИЯ ПРОГРАММЫ МРТ-ПОСЛЕДОВАТЕЛЬНОСТИ (Gradient Echo) ---")
+print(f"**Параметры протокола:** TR={TR} ms, TE={TE_RANDOM} ms, Угол наклона={FA}°")
+print("-" * 75)
 
-    print("-" * 35)
-    print("Отчет завершен.")
+# Вывод первых нескольких шагов последовательности
+for step in pulse_sequence:
+    if step["type"] == "RF":
+        print(f"| 📡 RF-Pulse: Возбуждение - {step['angle']} |")
+    elif step["type"] == "GRAD":
+        print(f"| 📈 Gradient ({step['axis']}): Амплитуда {step['amplitude']}, Длительность {step['duration']} |")
+    elif step["type"] == "ADC":
+        print(f"| 🖥️ ADC: Сбор данных - {step['samples']} точек |")
+    elif step["type"] == "DELAY":
+        print(f"| ⏳ DELAY: Ожидание - {step['duration']} |")
+
+print("-" * 75)
+print("Это один цикл TR. В реальном сканере цикл повторяется многократно для сбора K-пространства.")
