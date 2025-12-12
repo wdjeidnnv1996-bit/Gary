@@ -1,66 +1,82 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import random
-
-# --- Настройки генерации данных ---
-SAMPLE_SIZE = 10000  # Количество точек данных
-MU = random.uniform(50, 150)  # Среднее значение (Miu - μ)
-SIGMA = random.uniform(10, 30) # Стандартное отклонение (Sigma - σ)
-
-def generate_and_analyze_data(size, mu, sigma):
-    """
-    Генерирует случайные данные по нормальному распределению и вычисляет метрики.
-    """
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Кнопка Заказа Еды</title>
     
-    # 1. Генерация данных (используем numpy для эффективности)
-    # np.random.normal(loc=среднее, scale=станд.откл., size=количество)
-    data = np.random.normal(loc=mu, scale=sigma, size=size)
+    <style>
+        /* --- CSS: Стиль кнопки --- */
+        
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f4f4f4;
+            flex-direction: column;
+        }
+
+        #orderButton {
+            /* Базовый стиль */
+            background-color: #ff5722; /* Яркий оранжевый */
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 40px 2px;
+            cursor: pointer;
+            border-radius: 8px; /* Скругленные углы */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease, transform 0.1s ease;
+        }
+
+        #orderButton:hover {
+            /* Эффект при наведении */
+            background-color: #e64a19; /* Чуть темнее */
+        }
+
+        #orderButton:active {
+            /* Эффект при клике */
+            transform: scale(0.98);
+        }
+
+        #statusMessage {
+            margin-top: 20px;
+            font-size: 1.1em;
+            color: #333;
+            min-height: 30px; /* Чтобы избежать "прыжков" */
+        }
+    </style>
+</head>
+<body>
+
+    <button id="orderButton">
+        🛒 Заказать еду сейчас!
+    </button>
     
-    # 2. Вычисление статистических метрик
-    calculated_mean = np.mean(data)
-    calculated_std = np.std(data)
-    
-    # 3. Визуализация
-    plt.figure(figsize=(10, 6))
-    
-    # Гистограмма данных
-    plt.hist(data, bins=50, density=True, alpha=0.6, color='skyblue', label='Гистограмма данных')
-    
-    # Построение теоретической кривой нормального распределения
-    # 
+    <div id="statusMessage">Нажмите, чтобы оформить заказ.</div>
 
-[Image of Normal distribution curve with mean and standard deviation]
+    <script>
+        // --- JAVASCRIPT: Логика кнопки ---
+        
+        // Получаем ссылку на кнопку и элемент сообщения
+        const orderButton = document.getElementById('orderButton');
+        const statusMessage = document.getElementById('statusMessage');
 
-    xmin, xmax = plt.xlim()
-    x = np.linspace(xmin, xmax, 100)
-    p = (1 / (sigma * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x - mu) / sigma)**2)
-    plt.plot(x, p, 'r', linewidth=2, label=f'Теоретическая кривая (μ={mu:.2f}, σ={sigma:.2f})')
-    
-    # Добавление вертикальных линий для среднего и отклонений
-    plt.axvline(calculated_mean, color='green', linestyle='dashed', linewidth=2, label=f'Среднее (расч.)')
-    plt.axvline(calculated_mean + calculated_std, color='gray', linestyle='dotted', linewidth=1)
-    plt.axvline(calculated_mean - calculated_std, color='gray', linestyle='dotted', linewidth=1)
-    
-    plt.title(f'Генерация данных по нормальному распределению (N={size})')
-    plt.xlabel('Значение')
-    plt.ylabel('Плотность вероятности')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.show()
+        // Имитация данных о заказе
+        const currentOrder = {
+            item: "Пицца 'Маргарита'",
+            quantity: 1,
+            total: 550, // Стоимость в рублях/гривнах/тнг
+            deliveryTime: randomTime(25, 45) // Случайное время доставки
+        };
 
-    return data, calculated_mean, calculated_std
-
-# --- Главная часть программы ---
-
-print("--- 📊 АНАЛИЗ ДАННЫХ ПО НОРМАЛЬНОМУ РАСПРЕДЕЛЕНИЮ ---")
-print(f"Заданные параметры: Среднее (μ)={MU:.2f}, Стандартное отклонение (σ)={SIGMA:.2f}")
-print(f"Размер выборки: {SAMPLE_SIZE}")
-print("-" * 60)
-
-# Запуск генерации и анализа
-generated_data, calculated_mean, calculated_std = generate_and_analyze_data(SAMPLE_SIZE, MU, SIGMA)
-
-print(f"\nРезультаты анализа:")
-print(f"Расчетное среднее (Mean): {calculated_mean:.4f}")
-print(f"Расчетное ст. отклонение (Std Dev): {calculated_std:.4f}")
-print("Визуализация отображена в отдельном окне Matplotlib.")
+        // Вспомогательная функция для генерации случайного времени
+        function randomTime(min, max) {
+            return Math.floor(Math.random() * (max -
