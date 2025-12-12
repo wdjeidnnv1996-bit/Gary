@@ -1,104 +1,66 @@
+import numpy as np
+import matplotlib.pyplot as plt
 import random
-import time
-# В реальной жизни здесь использовались бы модули Pulseq
-# import pypulseq as mr 
 
-# --- Имитация основных функций Pulseq ---
+# --- Настройки генерации данных ---
+SAMPLE_SIZE = 10000  # Количество точек данных
+MU = random.uniform(50, 150)  # Среднее значение (Miu - μ)
+SIGMA = random.uniform(10, 30) # Стандартное отклонение (Sigma - σ)
 
-def create_rf_pulse(flip_angle, duration_ms):
-    """Имитирует создание РЧ-импульса (Радиочастотного)."""
-    return {"type": "RF", "angle": f"{flip_angle}°", "duration": f"{duration_ms} ms"}
-
-def create_gradient(axis, amplitude_mT_m, duration_us):
-    """Имитирует создание градиента (Линейное изменение поля)."""
-    return {"type": "GRAD", "axis": axis, "amplitude": f"{amplitude_mT_m} mT/m", "duration": f"{duration_us} us"}
-
-def create_adc(dwell_time_us, num_samples):
-    """Имитирует создание окна сбора данных (Аналого-Цифровой Преобразователь)."""
-    return {"type": "ADC", "dwell": f"{dwell_time_us} us", "samples": num_samples}
-
-# --- Основная функция: Программирование последовательности ---
-
-def program_gradient_echo_sequence(
-        TR_ms=100, 
-        TE_ms=5, 
-        flip_angle=random.randint(5, 90)
-    ):
+def generate_and_analyze_data(size, mu, sigma):
     """
-    Программирует простую 2D последовательность Градиентное Эхо (GRE).
-    GRE - это самая быстрая и базовая последовательность.
+    Генерирует случайные данные по нормальному распределению и вычисляет метрики.
     """
     
-    # 1. Основные параметры (рандомно сгенерированные для примера)
-    BW_Hz = 100000  # Ширина полосы пропускания (Bandwidth)
-    FOV_mm = 256    # Поле обзора (Field of View)
-    matrix = 256    # Размер матрицы (Matrix Size)
+    # 1. Генерация данных (используем numpy для эффективности)
+    # np.random.normal(loc=среднее, scale=станд.откл., size=количество)
+    data = np.random.normal(loc=mu, scale=sigma, size=size)
     
-    # Рассчеты для градиентов и сбора данных
-    readout_duration_us = int(matrix * (1000000 / BW_Hz)) # Время считывания (в мкс)
-    time_to_center_us = int(readout_duration_us / 2)
+    # 2. Вычисление статистических метрик
+    calculated_mean = np.mean(data)
+    calculated_std = np.std(data)
     
-    # --- Инициализация последовательности ---
-    sequence = []
+    # 3. Визуализация
+    plt.figure(figsize=(10, 6))
     
-    # --- 1. RF-Импульс возбуждения ---
-    # Угол наклона определяет контраст (Т1-зависимость)
-    rf_pulse = create_rf_pulse(flip_angle, duration_ms=1.0)
-    sequence.append(rf_pulse)
+    # Гистограмма данных
+    plt.hist(data, bins=50, density=True, alpha=0.6, color='skyblue', label='Гистограмма данных')
     
-    # --- 2. Градиент фазового кодирования (Pre-Phasing Gradient) ---
-    # Градиент, который задает первую точку в k-пространстве (Phase Encoding)
-    phase_encode_grad = create_gradient('Y', amplitude_mT_m=random.uniform(-5, 5), duration_us=500)
-    sequence.append(phase_encode_grad)
+    # Построение теоретической кривой нормального распределения
+    # 
+
+[Image of Normal distribution curve with mean and standard deviation]
+
+    xmin, xmax = plt.xlim()
+    x = np.linspace(xmin, xmax, 100)
+    p = (1 / (sigma * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x - mu) / sigma)**2)
+    plt.plot(x, p, 'r', linewidth=2, label=f'Теоретическая кривая (μ={mu:.2f}, σ={sigma:.2f})')
     
-    # --- 3. Градиент считывания (Readout Dephasing) ---
-    # Градиент, который дефазирует сигнал перед считыванием
-    read_dephase_grad = create_gradient('X', amplitude_mT_m=random.uniform(-10, -5), duration_us=1000)
-    sequence.append(read_dephase_grad)
-
-    # --- 4. Задержка до TE (Time to Echo) ---
-    # Время между RF-импульсом и центром сбора данных (TE)
-    delay_to_te = {"type": "DELAY", "duration": f"{TE_ms - 2} ms"}
-    sequence.append(delay_to_te)
+    # Добавление вертикальных линий для среднего и отклонений
+    plt.axvline(calculated_mean, color='green', linestyle='dashed', linewidth=2, label=f'Среднее (расч.)')
+    plt.axvline(calculated_mean + calculated_std, color='gray', linestyle='dotted', linewidth=1)
+    plt.axvline(calculated_mean - calculated_std, color='gray', linestyle='dotted', linewidth=1)
     
-    # --- 5. Сбор данных (ADC) и Градиент считывания ---
-    # ADC находится в центре градиента считывания
-    readout_grad = create_gradient('X', amplitude_mT_m=random.uniform(5, 10), duration_us=readout_duration_us)
-    adc_acquisition = create_adc(dwell_time_us=int(1000000 / BW_Hz), num_samples=matrix)
-    
-    sequence.append(readout_grad)
-    sequence.append(adc_acquisition)
+    plt.title(f'Генерация данных по нормальному распределению (N={size})')
+    plt.xlabel('Значение')
+    plt.ylabel('Плотность вероятности')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
 
-    # --- 6. Задержка до TR (Time to Repetition) ---
-    # TR - полное время цикла
-    delay_to_tr = {"type": "DELAY", "duration": f"{TR_ms - TE_ms} ms"}
-    sequence.append(delay_to_tr)
-    
-    return sequence, TR_ms, flip_angle
+    return data, calculated_mean, calculated_std
 
-# --- Выполнение ---
+# --- Главная часть программы ---
 
-# Случайные параметры
-TR_RANDOM = random.randint(50, 200)
-TE_RANDOM = random.randint(3, 15)
-ANGLE_RANDOM = random.randint(5, 45) # Для GRE обычно низкий угол
+print("--- 📊 АНАЛИЗ ДАННЫХ ПО НОРМАЛЬНОМУ РАСПРЕДЕЛЕНИЮ ---")
+print(f"Заданные параметры: Среднее (μ)={MU:.2f}, Стандартное отклонение (σ)={SIGMA:.2f}")
+print(f"Размер выборки: {SAMPLE_SIZE}")
+print("-" * 60)
 
-pulse_sequence, TR, FA = program_gradient_echo_sequence(TR_ms=TR_RANDOM, TE_ms=TE_RANDOM, flip_angle=ANGLE_RANDOM)
+# Запуск генерации и анализа
+generated_data, calculated_mean, calculated_std = generate_and_analyze_data(SAMPLE_SIZE, MU, SIGMA)
 
-print("--- 🩺 ИМИТАЦИЯ ПРОГРАММЫ МРТ-ПОСЛЕДОВАТЕЛЬНОСТИ (Gradient Echo) ---")
-print(f"**Параметры протокола:** TR={TR} ms, TE={TE_RANDOM} ms, Угол наклона={FA}°")
-print("-" * 75)
-
-# Вывод первых нескольких шагов последовательности
-for step in pulse_sequence:
-    if step["type"] == "RF":
-        print(f"| 📡 RF-Pulse: Возбуждение - {step['angle']} |")
-    elif step["type"] == "GRAD":
-        print(f"| 📈 Gradient ({step['axis']}): Амплитуда {step['amplitude']}, Длительность {step['duration']} |")
-    elif step["type"] == "ADC":
-        print(f"| 🖥️ ADC: Сбор данных - {step['samples']} точек |")
-    elif step["type"] == "DELAY":
-        print(f"| ⏳ DELAY: Ожидание - {step['duration']} |")
-
-print("-" * 75)
-print("Это один цикл TR. В реальном сканере цикл повторяется многократно для сбора K-пространства.")
+print(f"\nРезультаты анализа:")
+print(f"Расчетное среднее (Mean): {calculated_mean:.4f}")
+print(f"Расчетное ст. отклонение (Std Dev): {calculated_std:.4f}")
+print("Визуализация отображена в отдельном окне Matplotlib.")
