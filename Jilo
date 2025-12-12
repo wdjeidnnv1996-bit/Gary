@@ -1,0 +1,109 @@
+import json
+import random
+
+# --- Имитация данных, полученных от API (в виде JSON-строки) ---
+RANDOM_API_DATA = """
+[
+    {
+        "id": 101,
+        "username": "AlphaDev",
+        "email": "alpha@example.com",
+        "is_active": true,
+        "role": "admin",
+        "last_login_days": 5
+    },
+    {
+        "id": 102,
+        "username": "BetaUser",
+        "email": "beta@example.com",
+        "is_active": false,
+        "role": "user",
+        "last_login_days": 45
+    },
+    {
+        "id": 103,
+        "username": "GammaTest",
+        "email": "gamma@example.com",
+        "is_active": true,
+        "role": "moderator",
+        "last_login_days": 1
+    },
+    {
+        "id": 104,
+        "username": "Delta",
+        "email": "delta@example.com",
+        "is_active": false,
+        "role": "user",
+        "last_login_days": 180
+    }
+]
+"""
+# --- Конец имитации данных ---
+
+def load_and_parse_data(json_string):
+    """Преобразует JSON-строку в список словарей Python."""
+    try:
+        data = json.loads(json_string)
+        print(f"✅ Данные успешно загружены. Найдено {len(data)} записей.")
+        return data
+    except json.JSONDecodeError as e:
+        print(f"❌ ОШИБКА: Неверный формат JSON. {e}")
+        return []
+
+def filter_active_admins(user_data):
+    """
+    Фильтрует список пользователей, оставляя только тех, 
+    кто активен И имеет роль 'admin'.
+    """
+    filtered_list = []
+    
+    for user in user_data:
+        # Условие фильтрации
+        if user.get("is_active") is True and user.get("role") == "admin":
+            filtered_list.append(user)
+            
+    return filtered_list
+
+def filter_inactive_long_time(user_data, threshold_days=30):
+    """
+    Фильтрует пользователей, которые неактивны И не логинились дольше заданного порога.
+    """
+    inactive_list = []
+    
+    for user in user_data:
+        # Условие: неактивен И log-in > порога
+        if user.get("is_active") is False and user.get("last_login_days", 0) > threshold_days:
+            inactive_list.append(user)
+            
+    return inactive_list
+
+
+# --- Главная часть программы ---
+
+print("--- ⚙️ ОБРАБОТКА И ФИЛЬТРАЦИЯ JSON-ДАННЫХ ---")
+
+# 1. Загрузка и парсинг данных
+users = load_and_parse_data(RANDOM_API_DATA)
+
+if not users:
+    exit()
+
+# 2. Фильтрация активных администраторов
+admins = filter_active_admins(users)
+print("\n--- 📝 Отчет 1: Активные администраторы ---")
+if admins:
+    for user in admins:
+        print(f"Имя: {user['username']}, Email: {user['email']}")
+else:
+    print("Администраторы не найдены.")
+
+# 3. Фильтрация "спящих" пользователей (например, дольше 30 дней)
+INACTIVITY_THRESHOLD = 30
+inactive_users = filter_inactive_long_time(users, INACTIVITY_THRESHOLD)
+
+print(f"\n--- 😴 Отчет 2: Неактивные пользователи (логин > {INACTIVITY_THRESHOLD} дней) ---")
+if inactive_users:
+    for user in inactive_users:
+        print(f"Имя: {user['username']}, Роль: {user['role']}, Дней без входа: {user['last_login_days']}")
+else:
+    print("Спящие пользователи не найдены.")
